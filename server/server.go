@@ -2,23 +2,28 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
-	t "time"
 
 	"github.com/louiselykke/ChittyChat/proto"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Server struct {
-	proto.UnimplementedGetCurrentTimeServer
+	proto.UnimplementedChatServer
 }
 
-func (s *Server) GetTime(ctx context.Context, in *proto.GetTimeRequest) (*proto.GetTimeReply, error) {
-	fmt.Printf("Received GetTime request\n")
-	return &proto.GetTimeReply{Reply: t.Now().String()}, nil
+func (s *Server) Brodcast(ctx context.Context, msgStream *proto.Chat_BrodcastServer) *proto.Response {
+	log.Println("Brodcast call")
+	msg, err := msgStream.Recv()
+
+	for {
+
+	}
+	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
 
 func main() {
@@ -28,7 +33,8 @@ func main() {
 		log.Fatalf("Failed to listen on port 9080: %v", err)
 	}
 	grpcServer := grpc.NewServer()
-	proto.RegisterGetCurrentTimeServer(grpcServer, &Server{})
+
+	proto.RegisterchatServer(grpcServer, &Server{})
 
 	if err := grpcServer.Serve(list); err != nil {
 		log.Fatalf("failed to server %v", err)

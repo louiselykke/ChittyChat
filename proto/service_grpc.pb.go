@@ -14,88 +14,222 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// GetCurrentTimeClient is the client API for GetCurrentTime service.
+// ChatClient is the client API for Chat service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type GetCurrentTimeClient interface {
-	GetTime(ctx context.Context, in *GetTimeRequest, opts ...grpc.CallOption) (*GetTimeReply, error)
+type ChatClient interface {
+	Leave(ctx context.Context, in *User, opts ...grpc.CallOption) (*Response, error)
+	Publish(ctx context.Context, in *User, opts ...grpc.CallOption) (Chat_PublishClient, error)
+	Brodcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BrodcastClient, error)
 }
 
-type getCurrentTimeClient struct {
+type chatClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewGetCurrentTimeClient(cc grpc.ClientConnInterface) GetCurrentTimeClient {
-	return &getCurrentTimeClient{cc}
+func NewChatClient(cc grpc.ClientConnInterface) ChatClient {
+	return &chatClient{cc}
 }
 
-func (c *getCurrentTimeClient) GetTime(ctx context.Context, in *GetTimeRequest, opts ...grpc.CallOption) (*GetTimeReply, error) {
-	out := new(GetTimeReply)
-	err := c.cc.Invoke(ctx, "/proto.getCurrentTime/getTime", in, out, opts...)
+func (c *chatClient) Leave(ctx context.Context, in *User, opts ...grpc.CallOption) (*Response, error) {
+	out := new(Response)
+	err := c.cc.Invoke(ctx, "/proto.chat/leave", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// GetCurrentTimeServer is the server API for GetCurrentTime service.
-// All implementations must embed UnimplementedGetCurrentTimeServer
+func (c *chatClient) Publish(ctx context.Context, in *User, opts ...grpc.CallOption) (Chat_PublishClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[0], "/proto.chat/publish", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &chatPublishClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Chat_PublishClient interface {
+	Recv() (*Message, error)
+	grpc.ClientStream
+}
+
+type chatPublishClient struct {
+	grpc.ClientStream
+}
+
+func (x *chatPublishClient) Recv() (*Message, error) {
+	m := new(Message)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *chatClient) Brodcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BrodcastClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[1], "/proto.chat/brodcast", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &chatBrodcastClient{stream}
+	return x, nil
+}
+
+type Chat_BrodcastClient interface {
+	Send(*Message) error
+	CloseAndRecv() (*Response, error)
+	grpc.ClientStream
+}
+
+type chatBrodcastClient struct {
+	grpc.ClientStream
+}
+
+func (x *chatBrodcastClient) Send(m *Message) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *chatBrodcastClient) CloseAndRecv() (*Response, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(Response)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// ChatServer is the server API for Chat service.
+// All implementations must embed UnimplementedChatServer
 // for forward compatibility
-type GetCurrentTimeServer interface {
-	GetTime(context.Context, *GetTimeRequest) (*GetTimeReply, error)
-	mustEmbedUnimplementedGetCurrentTimeServer()
+type ChatServer interface {
+	Leave(context.Context, *User) (*Response, error)
+	Publish(*User, Chat_PublishServer) error
+	Brodcast(Chat_BrodcastServer) error
+	mustEmbedUnimplementedChatServer()
 }
 
-// UnimplementedGetCurrentTimeServer must be embedded to have forward compatible implementations.
-type UnimplementedGetCurrentTimeServer struct {
+// UnimplementedChatServer must be embedded to have forward compatible implementations.
+type UnimplementedChatServer struct {
 }
 
-func (UnimplementedGetCurrentTimeServer) GetTime(context.Context, *GetTimeRequest) (*GetTimeReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method GetTime not implemented")
+func (UnimplementedChatServer) Leave(context.Context, *User) (*Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Leave not implemented")
 }
-func (UnimplementedGetCurrentTimeServer) mustEmbedUnimplementedGetCurrentTimeServer() {}
+func (UnimplementedChatServer) Publish(*User, Chat_PublishServer) error {
+	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
+}
+func (UnimplementedChatServer) Brodcast(Chat_BrodcastServer) error {
+	return status.Errorf(codes.Unimplemented, "method Brodcast not implemented")
+}
+func (UnimplementedChatServer) mustEmbedUnimplementedChatServer() {}
 
-// UnsafeGetCurrentTimeServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to GetCurrentTimeServer will
+// UnsafeChatServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to ChatServer will
 // result in compilation errors.
-type UnsafeGetCurrentTimeServer interface {
-	mustEmbedUnimplementedGetCurrentTimeServer()
+type UnsafeChatServer interface {
+	mustEmbedUnimplementedChatServer()
 }
 
-func RegisterGetCurrentTimeServer(s grpc.ServiceRegistrar, srv GetCurrentTimeServer) {
-	s.RegisterService(&GetCurrentTime_ServiceDesc, srv)
+func RegisterChatServer(s grpc.ServiceRegistrar, srv ChatServer) {
+	s.RegisterService(&Chat_ServiceDesc, srv)
 }
 
-func _GetCurrentTime_GetTime_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetTimeRequest)
+func _Chat_Leave_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(User)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(GetCurrentTimeServer).GetTime(ctx, in)
+		return srv.(ChatServer).Leave(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/proto.getCurrentTime/getTime",
+		FullMethod: "/proto.chat/leave",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GetCurrentTimeServer).GetTime(ctx, req.(*GetTimeRequest))
+		return srv.(ChatServer).Leave(ctx, req.(*User))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// GetCurrentTime_ServiceDesc is the grpc.ServiceDesc for GetCurrentTime service.
+func _Chat_Publish_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(User)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ChatServer).Publish(m, &chatPublishServer{stream})
+}
+
+type Chat_PublishServer interface {
+	Send(*Message) error
+	grpc.ServerStream
+}
+
+type chatPublishServer struct {
+	grpc.ServerStream
+}
+
+func (x *chatPublishServer) Send(m *Message) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _Chat_Brodcast_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ChatServer).Brodcast(&chatBrodcastServer{stream})
+}
+
+type Chat_BrodcastServer interface {
+	SendAndClose(*Response) error
+	Recv() (*Message, error)
+	grpc.ServerStream
+}
+
+type chatBrodcastServer struct {
+	grpc.ServerStream
+}
+
+func (x *chatBrodcastServer) SendAndClose(m *Response) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *chatBrodcastServer) Recv() (*Message, error) {
+	m := new(Message)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// Chat_ServiceDesc is the grpc.ServiceDesc for Chat service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var GetCurrentTime_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "proto.getCurrentTime",
-	HandlerType: (*GetCurrentTimeServer)(nil),
+var Chat_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "proto.chat",
+	HandlerType: (*ChatServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "getTime",
-			Handler:    _GetCurrentTime_GetTime_Handler,
+			MethodName: "leave",
+			Handler:    _Chat_Leave_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "publish",
+			Handler:       _Chat_Publish_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "brodcast",
+			Handler:       _Chat_Brodcast_Handler,
+			ClientStreams: true,
+		},
+	},
 	Metadata: "proto/service.proto",
 }

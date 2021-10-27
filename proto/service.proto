@@ -4,12 +4,26 @@ package proto;
 option go_package = "github.com/louiselykke/ChittyChat;proto";
 
 
-service getCurrentTime {
-    rpc getTime (GetTimeRequest) returns (GetTimeReply) {}
+service chat {
+    rpc leave (User) returns (Response) {}
+    rpc publish (User) returns (stream Message) {} //joining the channel 
+    rpc brodcast (stream Message) returns (Response) {} // brodcasting messages to server
+    // rpc Broadcast (GetTimeRequest) returns (getAMessage) {}
 }
 
-message GetTimeRequest {}
+// this is the client id and name 
+message User {
+    string id = 1;
+    string name = 2;
+}
 
-message GetTimeReply {
-    string reply = 1;
+// message to be sent (published) to server and clients (broadcast)
+message Message{
+    User user = 1;
+    string message = 2;
+    string lamport = 3;
+}
+
+// Empty response 
+message Response {
 }
