@@ -1,17 +1,28 @@
 package main
 
 import (
+	"bufio"
 	"context"
-	"fmt"
+	"flag"
 	"log"
+	"os"
 
-	t "time"
-
-	"github.com/louiselykke/ChittyChat/proto"
+	chit "github.com/louiselykke/ChittyChat/proto"
 	"google.golang.org/grpc"
 )
 
+var userName = flag.String("user", "Anon", "Username for chatting")
+var lamport int64 = 0
+
+type User struct {
+	id   string
+	name string
+}
+
 func main() {
+
+	flag.Parse()
+
 	// Creat a virtual RPC Client Connection on port  9080 WithInsecure (because  of http)
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial(":9080", grpc.WithInsecure())
@@ -21,24 +32,34 @@ func main() {
 
 	// Defer means: When this function returns, call this method (meaing, one main is done, close connection)
 	defer conn.Close()
-
-	//  Create new Client from generated gRPC code from proto
-	c := proto.NewGetCurrentTimeClient(conn)
-
-	for {
-		SendGetTimeRequest(c)
-		t.Sleep(5 * t.Second)
+	var thisUser = User{
+		id:   "1",
+		name: *userName,
 	}
+	//  Create new Client from generated gRPC code from proto
+	c := chit.NewChatClient(conn)
+	log.Printf("this is no %s", thisUser.name)
+	ctx := context.Background()
+	sendMessage(ctx, c, "i just joined")
+
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		go sendMessage(ctx, c, scanner.Text())
+	}
+
 }
 
-func SendGetTimeRequest(c proto.GetCurrentTimeClient) {
-	// Between the curly brackets are nothing, because the .proto file expects no input.
-	message := proto.GetTimeRequest{}
-
-	response, err := c.GetTime(context.Background(), &message)
+func sendMessage(ctx context.Context, client chit.ChatClient, message string) {
+	stream, err := client.Brodcast(ctx)
 	if err != nil {
-		log.Fatalf("Error when calling GetTime: %s", err)
+		log.Printf("Cannot send message: error: %v", err)
 	}
-
-	fmt.Printf("Look Emre Something works! \nCurrent time right now: %s\n", response.Reply)
+	msg := chit.Message{
+		User: &chit.User{
+			Id:   "1",
+			Name: *userName},
+		Message: message,
+		Lamport: lamport,
+	}
+	stream.Send(&msg)
 }

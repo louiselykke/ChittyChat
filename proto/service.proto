@@ -6,8 +6,8 @@ option go_package = "github.com/louiselykke/ChittyChat;proto";
 
 service chat {
     rpc leave (User) returns (Response) {}
-    rpc publish (User) returns (stream Message) {} //joining the channel 
-    rpc brodcast (stream Message) returns (Response) {} // brodcasting messages to server
+    rpc publish (User) returns (stream Message) {} //client joining the channel by supplying username and streaming messages to server
+    rpc brodcast (stream Message) returns (Response) {} // brodcasting messages from to clients, clients recieves response
     // rpc Broadcast (GetTimeRequest) returns (getAMessage) {}
 }
 
@@ -21,7 +21,7 @@ message User {
 message Message{
     User user = 1;
     string message = 2;
-    string lamport = 3;
+    int64 lamport = 3;
 }
 
 // Empty response 
