@@ -4,6 +4,12 @@ Miniproject 2
 
 
 ## Task list 
- - Set up gRPC following NaddiNadja guide https://github.com/NaddiNadja/grpc101
-  - Set up server 
-  - Set clients up 
+ - done!!  Set up gRPC following NaddiNadja guide https://github.com/NaddiNadja/grpc101 
+  - done!! Set up server 
+  - done!! Set clients up 
+  - maybe use publish and broadcast methods? 
+  - Lamport time
+    - add lamport time to messages 
+    - update lamport time in clients (and server)
+    - maybe vector clock
+
