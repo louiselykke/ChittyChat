@@ -6,3 +6,12 @@ cli:
 
 serv:
 	go run server/server.go
+
+cli1:
+	go run client/client.go -user emre
+
+cli2:
+	go run client/client.go -user bjorn
+
+cli3:
+	go run client/client.go -user louise

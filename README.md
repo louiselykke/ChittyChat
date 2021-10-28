@@ -2,6 +2,22 @@
 Miniproject 2 
 
 
+run the following commands to run the server and clients 
+in different terminals run:
+```make serv```
+
+```make cli```
+
+```make cli1```
+
+```make cli2```
+
+```make cli3```
+
+
+to remake the proto generated files run 
+    ```make gen```
+
 
 ## Task list 
  - done!!  Set up gRPC following NaddiNadja guide https://github.com/NaddiNadja/grpc101 
