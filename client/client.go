@@ -12,7 +12,7 @@ import (
 )
 
 var userName = flag.String("user", "Anon", "Username for chatting")
-var lamport int64 = 0
+var lamport int = 0
 
 func main() {
 
@@ -35,30 +35,32 @@ func main() {
 	ctx := context.Background()
 
 	// creating a bidirectional stream / but this means that we cannot join and cut the connection with a function call :(
-	stream, err := c.Broadcast(ctx)
+
+	stream, err := c.Broadcast(ctx) // this establishes the connection to the server.
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := stream.SendMsg(&chit.Message{ //
+	if err := stream.SendMsg(&chit.Message{ // send the initial message.
 		User: &chit.User{
 			Id:   "1",
 			Name: *userName},
 		Message: "",
-		Lamport: lamport,
+		Lamport: int64(lamport + 1),
 	}); err != nil {
 		log.Fatal(err)
 	}
 	scanner := bufio.NewScanner(os.Stdin)
 
 	go func() {
-		for scanner.Scan() {
+		for scanner.Scan() { /// for each text entered in the terminal a message will be send to the server through
 			msg := scanner.Text()
+			lamport = lamport + 1
 			if err := stream.SendMsg(&chit.Message{
 				User: &chit.User{
 					Id:   "1",
 					Name: *userName},
 				Message: msg,
-				Lamport: lamport,
+				Lamport: int64(lamport),
 			}); err != nil {
 				log.Fatal(err)
 			}
@@ -66,14 +68,16 @@ func main() {
 		}
 	}()
 	for {
-		resp, err := stream.Recv()
+		resp, err := stream.Recv() //
 		if err != nil {
 			log.Fatal(err)
 		}
 
+		updateLamportTime(int(resp.Lamport))
+
 		// add ifstatement to no log message if this client just send that message...
 
-		log.Printf("recv from %s: %s", resp.User.Name, resp.Message)
+		log.Printf("recv from %s: %s, at Lamport time %d", resp.User.Name, resp.Message, resp.Lamport)
 	}
 }
 
@@ -84,6 +88,15 @@ func welcome() {
 	 ------------------`)
 }
 
+func updateLamportTime(msgTime int) int {
+	if lamport > msgTime {
+		lamport = lamport + 1
+	} else {
+		lamport = msgTime + 1
+	}
+	return lamport
+}
+
 //#### old methods not relevant
 func publish(ctx context.Context, client chit.Chat_BroadcastClient, message string) {
 
@@ -92,7 +105,7 @@ func publish(ctx context.Context, client chit.Chat_BroadcastClient, message stri
 			Id:   "1",
 			Name: *userName},
 		Message: message,
-		Lamport: lamport,
+		Lamport: int64(lamport),
 	}
 	client.Send(&msg)
 }
