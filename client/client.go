@@ -14,14 +14,9 @@ import (
 var userName = flag.String("user", "Anon", "Username for chatting")
 var lamport int64 = 0
 
-type User struct {
-	id   string
-	name string
-}
-
 func main() {
 
-	flag.Parse()
+	flag.Parse() // adds the value of the flag parameters default or userspecific
 
 	// Creat a virtual RPC Client Connection on port  9080 WithInsecure (because  of http)
 	var conn *grpc.ClientConn
@@ -30,30 +25,68 @@ func main() {
 		log.Fatalf("Could not connect: %s", err)
 	}
 
-	// Defer means: When this function returns, call this method (meaing, one main is done, close connection)
+	// When this function returns, call con.Close
+	// use defer to do so
 	defer conn.Close()
-	var thisUser = User{
-		id:   "1",
-		name: *userName,
-	}
+
 	//  Create new Client from generated gRPC code from proto
 	c := chit.NewChatClient(conn)
-	log.Printf("this is no %s", thisUser.name)
+	welcome()
 	ctx := context.Background()
-	sendMessage(ctx, c, "i just joined")
 
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		go sendMessage(ctx, c, scanner.Text())
+	// creating a bidirectional stream / but this means that we cannot join and cut the connection with a function call :(
+	stream, err := c.Broadcast(ctx)
+	if err != nil {
+		log.Fatal(err)
 	}
+	if err := stream.SendMsg(&chit.Message{ //
+		User: &chit.User{
+			Id:   "1",
+			Name: *userName},
+		Message: "",
+		Lamport: lamport,
+	}); err != nil {
+		log.Fatal(err)
+	}
+	scanner := bufio.NewScanner(os.Stdin)
 
+	go func() {
+		for scanner.Scan() {
+			msg := scanner.Text()
+			if err := stream.SendMsg(&chit.Message{
+				User: &chit.User{
+					Id:   "1",
+					Name: *userName},
+				Message: msg,
+				Lamport: lamport,
+			}); err != nil {
+				log.Fatal(err)
+			}
+			log.Printf("sent: %s", msg)
+		}
+	}()
+	for {
+		resp, err := stream.Recv()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// add ifstatement to no log message if this client just send that message...
+
+		log.Printf("recv from %s: %s", resp.User.Name, resp.Message)
+	}
 }
 
-func sendMessage(ctx context.Context, client chit.ChatClient, message string) {
-	stream, err := client.Brodcast(ctx)
-	if err != nil {
-		log.Printf("Cannot send message: error: %v", err)
-	}
+func welcome() {
+	log.Println(`
+	__________________
+	< CHITTY CHAT CHAT >
+	 ------------------`)
+}
+
+//#### old methods not relevant
+func publish(ctx context.Context, client chit.Chat_BroadcastClient, message string) {
+
 	msg := chit.Message{
 		User: &chit.User{
 			Id:   "1",
@@ -61,5 +94,15 @@ func sendMessage(ctx context.Context, client chit.ChatClient, message string) {
 		Message: message,
 		Lamport: lamport,
 	}
-	stream.Send(&msg)
+	client.Send(&msg)
+}
+
+func recieve(ctx context.Context, client chit.Chat_BroadcastClient) {
+	for {
+		msg, err := client.Recv()
+		if err != nil {
+			log.Printf("Oops nothing recived: %v", err)
+		}
+		log.Printf("%s says: %s -- at Lamport time %b", msg.GetUser(), msg.GetMessage(), msg.Lamport)
+	}
 }

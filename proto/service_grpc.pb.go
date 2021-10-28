@@ -20,7 +20,7 @@ const _ = grpc.SupportPackageIsVersion7
 type ChatClient interface {
 	Leave(ctx context.Context, in *User, opts ...grpc.CallOption) (*Response, error)
 	Publish(ctx context.Context, in *User, opts ...grpc.CallOption) (Chat_PublishClient, error)
-	Brodcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BrodcastClient, error)
+	Broadcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BroadcastClient, error)
 }
 
 type chatClient struct {
@@ -72,34 +72,31 @@ func (x *chatPublishClient) Recv() (*Message, error) {
 	return m, nil
 }
 
-func (c *chatClient) Brodcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BrodcastClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[1], "/proto.chat/brodcast", opts...)
+func (c *chatClient) Broadcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BroadcastClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[1], "/proto.chat/broadcast", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &chatBrodcastClient{stream}
+	x := &chatBroadcastClient{stream}
 	return x, nil
 }
 
-type Chat_BrodcastClient interface {
+type Chat_BroadcastClient interface {
 	Send(*Message) error
-	CloseAndRecv() (*Response, error)
+	Recv() (*Message, error)
 	grpc.ClientStream
 }
 
-type chatBrodcastClient struct {
+type chatBroadcastClient struct {
 	grpc.ClientStream
 }
 
-func (x *chatBrodcastClient) Send(m *Message) error {
+func (x *chatBroadcastClient) Send(m *Message) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *chatBrodcastClient) CloseAndRecv() (*Response, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(Response)
+func (x *chatBroadcastClient) Recv() (*Message, error) {
+	m := new(Message)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -112,7 +109,7 @@ func (x *chatBrodcastClient) CloseAndRecv() (*Response, error) {
 type ChatServer interface {
 	Leave(context.Context, *User) (*Response, error)
 	Publish(*User, Chat_PublishServer) error
-	Brodcast(Chat_BrodcastServer) error
+	Broadcast(Chat_BroadcastServer) error
 	mustEmbedUnimplementedChatServer()
 }
 
@@ -126,8 +123,8 @@ func (UnimplementedChatServer) Leave(context.Context, *User) (*Response, error) 
 func (UnimplementedChatServer) Publish(*User, Chat_PublishServer) error {
 	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
 }
-func (UnimplementedChatServer) Brodcast(Chat_BrodcastServer) error {
-	return status.Errorf(codes.Unimplemented, "method Brodcast not implemented")
+func (UnimplementedChatServer) Broadcast(Chat_BroadcastServer) error {
+	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
 func (UnimplementedChatServer) mustEmbedUnimplementedChatServer() {}
 
@@ -181,25 +178,25 @@ func (x *chatPublishServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func _Chat_Brodcast_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ChatServer).Brodcast(&chatBrodcastServer{stream})
+func _Chat_Broadcast_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ChatServer).Broadcast(&chatBroadcastServer{stream})
 }
 
-type Chat_BrodcastServer interface {
-	SendAndClose(*Response) error
+type Chat_BroadcastServer interface {
+	Send(*Message) error
 	Recv() (*Message, error)
 	grpc.ServerStream
 }
 
-type chatBrodcastServer struct {
+type chatBroadcastServer struct {
 	grpc.ServerStream
 }
 
-func (x *chatBrodcastServer) SendAndClose(m *Response) error {
+func (x *chatBroadcastServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *chatBrodcastServer) Recv() (*Message, error) {
+func (x *chatBroadcastServer) Recv() (*Message, error) {
 	m := new(Message)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -226,8 +223,9 @@ var Chat_ServiceDesc = grpc.ServiceDesc{
 			ServerStreams: true,
 		},
 		{
-			StreamName:    "brodcast",
-			Handler:       _Chat_Brodcast_Handler,
+			StreamName:    "broadcast",
+			Handler:       _Chat_Broadcast_Handler,
+			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},
