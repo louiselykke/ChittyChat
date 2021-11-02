@@ -28,7 +28,7 @@ to remake the proto generated files run
     - Done!! update lamport time in clients (and server)
     - Nope! maybe vector clock - not sure how to do the with increasing/decreasing number of clients
  - Done!! need to make it possible to have several users named anon. 
-  - Done! -added unique identifierchange the way the map works. or add an unique identifier to the user in the message. 
+  - Done! (added unique identifier) Change the way the map works. or add an unique identifier to the user in the message. 
     - Nope! This will probably need a different implimentation of the streams. 
     suggested flow of streams 
         - rpc publish(User) retruns (sream message)
