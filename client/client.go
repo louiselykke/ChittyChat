@@ -5,7 +5,10 @@ import (
 	"context"
 	"flag"
 	"log"
+	"math/rand"
 	"os"
+	"strconv"
+	"time"
 
 	chit "github.com/louiselykke/ChittyChat/proto"
 	"google.golang.org/grpc"
@@ -25,6 +28,14 @@ func main() {
 		log.Fatalf("Could not connect: %s", err)
 	}
 
+	x := rand.NewSource(time.Now().UnixNano())
+	y := rand.New(x)
+
+	user := chit.User{
+		Id:   strconv.Itoa(y.Intn(1000)),
+		Name: *userName,
+	}
+
 	// When this function returns, call con.Close
 	// use defer to do so
 	defer conn.Close()
@@ -41,10 +52,8 @@ func main() {
 		log.Fatal(err)
 	}
 	if err := stream.SendMsg(&chit.Message{ // send the initial message.
-		User: &chit.User{
-			Id:   "1",
-			Name: *userName},
-		Message: "",
+		User:    &user,
+		Message: "Attempting to register " + user.Name + " on the server",
 		Lamport: int64(lamport + 1),
 	}); err != nil {
 		log.Fatal(err)
@@ -56,15 +65,13 @@ func main() {
 			msg := scanner.Text()
 			lamport = lamport + 1
 			if err := stream.SendMsg(&chit.Message{
-				User: &chit.User{
-					Id:   "1",
-					Name: *userName},
+				User:    &user,
 				Message: msg,
 				Lamport: int64(lamport),
 			}); err != nil {
 				log.Fatal(err)
 			}
-			log.Printf("sent: %s", msg)
+			log.Printf("sent: %s, at lamport time %d", msg, lamport)
 		}
 	}()
 	for {

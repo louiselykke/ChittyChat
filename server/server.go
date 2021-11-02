@@ -11,10 +11,10 @@ import (
 )
 
 var lamport int = 0
+var clients map[string]chit.Chat_BroadcastServer
 
 type Server struct {
 	chit.UnimplementedChatServer
-	clients map[string]chit.Chat_BroadcastServer
 
 	mu sync.RWMutex
 }
@@ -29,12 +29,13 @@ func (s *Server) Broadcast(msgStream chit.Chat_BroadcastServer) error {
 		if err != nil {
 			return err
 		}
-		thisUser = msg.User.Name
-		defer s.removeClient(thisUser)
-		s.addClient(thisUser, msgStream)
-
 		s.updateLamportTime(int(msg.Lamport))
+		thisUser = msg.User.Name
 		log.Printf("broadcast: %s at Lamport time %d", msg.Message, lamport)
+		if clients[thisUser] == nil {
+			s.addClient(thisUser, msgStream)
+			defer s.removeClient(thisUser)
+		}
 		for _, client := range s.getClients() {
 			if client == msgStream { // The client sending the messages does not recieve a response through the stream.
 				continue
@@ -47,18 +48,24 @@ func (s *Server) Broadcast(msgStream chit.Chat_BroadcastServer) error {
 	}
 }
 
-func (s *Server) addClient(userId string, srv chit.Chat_BroadcastServer) {
+func (s *Server) addClient(userName string, srv chit.Chat_BroadcastServer) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.clients[userId] = srv
-	log.Printf("%s joined the chat! Treat them well", userId)
+	s.updateLamportTime(lamport)
+	clients[userName] = srv
+	log.Printf("%s joined the chat, at Lamport time %d! Treat them well", userName, lamport)
+
 }
 
 func (s *Server) removeClient(userId string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	delete(s.clients, userId)
-	log.Printf("%s left the chat", userId)
+	if _, ok := clients[userId]; ok {
+		delete(clients, userId)
+		s.updateLamportTime(lamport)
+		log.Printf("%s left the chat at Lamport time %d", userId, lamport)
+
+	}
 }
 
 func (s *Server) getClients() []chit.Chat_BroadcastServer {
@@ -66,7 +73,7 @@ func (s *Server) getClients() []chit.Chat_BroadcastServer {
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	for _, c := range s.clients {
+	for _, c := range clients {
 		cs = append(cs, c)
 	}
 	return cs
@@ -80,7 +87,9 @@ func main() {
 	}
 	grpcServer := grpc.NewServer()
 
-	chit.RegisterChatServer(grpcServer, &Server{clients: make(map[string]chit.Chat_BroadcastServer),
+	clients = make(map[string]chit.Chat_BroadcastServer)
+
+	chit.RegisterChatServer(grpcServer, &Server{
 		mu: sync.RWMutex{}})
 
 	if err := grpcServer.Serve(list); err != nil {
