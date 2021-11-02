@@ -51,19 +51,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := stream.SendMsg(&chit.Message{ // send the initial message.
+	lamport += 1 // event establishing conection increment lamport
+
+	if err := stream.SendMsg(&chit.Message{ // send the initial message | no increment in lamport time as this is part of establish connect
 		User:    &user,
 		Message: "Attempting to register " + user.Name + " on the server",
-		Lamport: int64(lamport + 1),
+		Lamport: int64(lamport),
 	}); err != nil {
 		log.Fatal(err)
 	}
+
 	scanner := bufio.NewScanner(os.Stdin)
 
 	go func() {
 		for scanner.Scan() { /// for each text entered in the terminal a message will be send to the server through
+			lamport += 1 // increment lamport
 			msg := scanner.Text()
-			lamport = lamport + 1
 			if err := stream.SendMsg(&chit.Message{
 				User:    &user,
 				Message: msg,
@@ -82,9 +85,7 @@ func main() {
 
 		updateLamportTime(int(resp.Lamport))
 
-		// add ifstatement to no log message if this client just send that message...
-
-		log.Printf("recv from %s: %s, at Lamport time %d", resp.User.Name, resp.Message, resp.Lamport)
+		log.Printf("recv from %s: %s, at Lamport time %d", resp.User.Name, resp.Message, lamport)
 	}
 }
 
@@ -102,27 +103,4 @@ func updateLamportTime(msgTime int) int {
 		lamport = msgTime + 1
 	}
 	return lamport
-}
-
-//#### old methods not relevant
-func publish(ctx context.Context, client chit.Chat_BroadcastClient, message string) {
-
-	msg := chit.Message{
-		User: &chit.User{
-			Id:   "1",
-			Name: *userName},
-		Message: message,
-		Lamport: int64(lamport),
-	}
-	client.Send(&msg)
-}
-
-func recieve(ctx context.Context, client chit.Chat_BroadcastClient) {
-	for {
-		msg, err := client.Recv()
-		if err != nil {
-			log.Printf("Oops nothing recived: %v", err)
-		}
-		log.Printf("%s says: %s -- at Lamport time %b", msg.GetUser(), msg.GetMessage(), msg.Lamport)
-	}
 }

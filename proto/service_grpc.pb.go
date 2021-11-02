@@ -18,8 +18,6 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChatClient interface {
-	Leave(ctx context.Context, in *User, opts ...grpc.CallOption) (*Response, error)
-	Publish(ctx context.Context, in *User, opts ...grpc.CallOption) (Chat_PublishClient, error)
 	Broadcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BroadcastClient, error)
 }
 
@@ -31,49 +29,8 @@ func NewChatClient(cc grpc.ClientConnInterface) ChatClient {
 	return &chatClient{cc}
 }
 
-func (c *chatClient) Leave(ctx context.Context, in *User, opts ...grpc.CallOption) (*Response, error) {
-	out := new(Response)
-	err := c.cc.Invoke(ctx, "/proto.chat/leave", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *chatClient) Publish(ctx context.Context, in *User, opts ...grpc.CallOption) (Chat_PublishClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[0], "/proto.chat/publish", opts...)
-	if err != nil {
-		return nil, err
-	}
-	x := &chatPublishClient{stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
-}
-
-type Chat_PublishClient interface {
-	Recv() (*Message, error)
-	grpc.ClientStream
-}
-
-type chatPublishClient struct {
-	grpc.ClientStream
-}
-
-func (x *chatPublishClient) Recv() (*Message, error) {
-	m := new(Message)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 func (c *chatClient) Broadcast(ctx context.Context, opts ...grpc.CallOption) (Chat_BroadcastClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[1], "/proto.chat/broadcast", opts...)
+	stream, err := c.cc.NewStream(ctx, &Chat_ServiceDesc.Streams[0], "/proto.chat/broadcast", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -107,8 +64,6 @@ func (x *chatBroadcastClient) Recv() (*Message, error) {
 // All implementations must embed UnimplementedChatServer
 // for forward compatibility
 type ChatServer interface {
-	Leave(context.Context, *User) (*Response, error)
-	Publish(*User, Chat_PublishServer) error
 	Broadcast(Chat_BroadcastServer) error
 	mustEmbedUnimplementedChatServer()
 }
@@ -117,12 +72,6 @@ type ChatServer interface {
 type UnimplementedChatServer struct {
 }
 
-func (UnimplementedChatServer) Leave(context.Context, *User) (*Response, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Leave not implemented")
-}
-func (UnimplementedChatServer) Publish(*User, Chat_PublishServer) error {
-	return status.Errorf(codes.Unimplemented, "method Publish not implemented")
-}
 func (UnimplementedChatServer) Broadcast(Chat_BroadcastServer) error {
 	return status.Errorf(codes.Unimplemented, "method Broadcast not implemented")
 }
@@ -137,45 +86,6 @@ type UnsafeChatServer interface {
 
 func RegisterChatServer(s grpc.ServiceRegistrar, srv ChatServer) {
 	s.RegisterService(&Chat_ServiceDesc, srv)
-}
-
-func _Chat_Leave_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(User)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(ChatServer).Leave(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/proto.chat/leave",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChatServer).Leave(ctx, req.(*User))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _Chat_Publish_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(User)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
-	}
-	return srv.(ChatServer).Publish(m, &chatPublishServer{stream})
-}
-
-type Chat_PublishServer interface {
-	Send(*Message) error
-	grpc.ServerStream
-}
-
-type chatPublishServer struct {
-	grpc.ServerStream
-}
-
-func (x *chatPublishServer) Send(m *Message) error {
-	return x.ServerStream.SendMsg(m)
 }
 
 func _Chat_Broadcast_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -210,18 +120,8 @@ func (x *chatBroadcastServer) Recv() (*Message, error) {
 var Chat_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "proto.chat",
 	HandlerType: (*ChatServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "leave",
-			Handler:    _Chat_Leave_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "publish",
-			Handler:       _Chat_Publish_Handler,
-			ServerStreams: true,
-		},
 		{
 			StreamName:    "broadcast",
 			Handler:       _Chat_Broadcast_Handler,

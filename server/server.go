@@ -34,9 +34,24 @@ func (s *Server) Broadcast(msgStream chit.Chat_BroadcastServer) error {
 		log.Printf("broadcast: %s at Lamport time %d", msg.Message, lamport)
 		if clients[thisUser] == nil {
 			s.addClient(thisUser, msgStream)
-			defer s.removeClient(thisUser)
+			defer func(msg *chit.Message) {
+				s.updateLamportTime(lamport)
+				s.removeClient(msg.User.Name)
+				for clientName, client := range clients {
+					if client == msgStream { // The client sending the messages does not recieve a response through the stream.
+						continue
+					}
+					msg.Lamport = int64(s.updateLamportTime(int(msg.Lamport)))
+					msg.Message = msg.User.Name + " left the chat"
+					if err := client.Send(msg); err != nil {
+						log.Printf("broadcast err: %v", err)
+					}
+					log.Printf("Told %s, that %s, at lamport time %d", clientName, msg.Message, lamport)
+				}
+			}(msg)
 		}
-		for _, client := range s.getClients() {
+
+		for clientName, client := range clients {
 			if client == msgStream { // The client sending the messages does not recieve a response through the stream.
 				continue
 			}
@@ -44,6 +59,7 @@ func (s *Server) Broadcast(msgStream chit.Chat_BroadcastServer) error {
 			if err := client.Send(msg); err != nil {
 				log.Printf("broadcast err: %v", err)
 			}
+			log.Printf("Told %s, that %s joined, at lamport time %d", clientName, msg.User.Name, lamport)
 		}
 	}
 }
@@ -53,17 +69,19 @@ func (s *Server) addClient(userName string, srv chit.Chat_BroadcastServer) {
 	defer s.mu.Unlock()
 	s.updateLamportTime(lamport)
 	clients[userName] = srv
-	log.Printf("%s joined the chat, at Lamport time %d! Treat them well", userName, lamport)
+	log.Printf("%s added to the list of clients, at Lamport time %d!", userName, lamport)
 
 }
 
 func (s *Server) removeClient(userId string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.updateLamportTime(lamport)
+	log.Printf("%s left, at lamport time %d", userId, lamport)
 	if _, ok := clients[userId]; ok {
 		delete(clients, userId)
 		s.updateLamportTime(lamport)
-		log.Printf("%s left the chat at Lamport time %d", userId, lamport)
+		log.Printf("Removing %s from the list of client at Lamport time %d", userId, lamport)
 
 	}
 }
