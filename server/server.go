@@ -30,7 +30,7 @@ func (s *Server) Broadcast(msgStream chit.Chat_BroadcastServer) error {
 			return err
 		}
 		s.updateLamportTime(int(msg.Lamport))
-		thisUser = msg.User.Name
+		thisUser = msg.User.Name + msg.User.Id
 		log.Printf("broadcast: %s at Lamport time %d", msg.Message, lamport)
 		if clients[thisUser] == nil {
 			s.addClient(thisUser, msgStream)
